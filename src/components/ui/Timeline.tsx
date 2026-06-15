@@ -1,33 +1,58 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronDown } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 function getQuarterLabel(index: number, events: { date: string }[]): string {
-  if (!events.length || index < 0 || index >= events.length) {
+  if (!events || !events.length || index < 0 || index >= events.length) {
     return '—';
   }
-  const date = events[index].date;
-  const year = date.slice(0, 4);
-  const month = parseInt(date.slice(5, 7), 10);
-  const quarter = Math.ceil(month / 3);
-  return `${year} Q${quarter}`;
+  try {
+    const date = events[index].date;
+    if (!date) return '—';
+    const year = date.slice(0, 4);
+    const month = parseInt(date.slice(5, 7), 10);
+    const quarter = Math.ceil(month / 3);
+    return `${year} Q${quarter}`;
+  } catch {
+    return '—';
+  }
 }
 
 export default function Timeline() {
-  const {
-    currentTimeIndex,
-    isPlaying,
-    playbackSpeed,
-    timelineEvents,
-    setTimeIndex,
-    setPlaying,
-    setPlaybackSpeed,
-  } = useAppStore();
+  const currentTimeIndex = useAppStore((s) => s.currentTimeIndex);
+  const isPlaying = useAppStore((s) => s.isPlaying);
+  const playbackSpeed = useAppStore((s) => s.playbackSpeed);
+  const timelineEvents = useAppStore((s) => s.timelineEvents);
+  const _setTimeIndex = useAppStore((s) => s.setTimeIndex);
+  const _setPlaying = useAppStore((s) => s.setPlaying);
+  const _setPlaybackSpeed = useAppStore((s) => s.setPlaybackSpeed);
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const speedMenuRef = useRef<HTMLDivElement>(null);
 
-  const maxIndex = Math.max(0, timelineEvents.length - 1);
+  const maxIndex = Math.max(0, (timelineEvents?.length || 0) - 1);
+
+  const setTimeIndex = useCallback(
+    (idx: number) => {
+      const safeIdx = Math.max(0, Math.min(Math.floor(idx), maxIndex));
+      _setTimeIndex(safeIdx);
+    },
+    [maxIndex, _setTimeIndex],
+  );
+
+  const setPlaying = useCallback(
+    (p: boolean) => {
+      _setPlaying(p);
+    },
+    [_setPlaying],
+  );
+
+  const setPlaybackSpeed = useCallback(
+    (s: 1 | 2 | 4) => {
+      _setPlaybackSpeed(s);
+    },
+    [_setPlaybackSpeed],
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -39,34 +64,77 @@ export default function Timeline() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (!isPlaying) return;
-    const interval = setInterval(() => {
-      const state = useAppStore.getState();
-      const maxIdx = Math.max(0, state.timelineEvents.length - 1);
-      if (state.currentTimeIndex >= maxIdx) {
-        useAppStore.getState().setPlaying(false);
-        return;
-      }
-      useAppStore.getState().setTimeIndex(state.currentTimeIndex + 1);
-    }, 1000 / playbackSpeed);
-    return () => clearInterval(interval);
-  }, [isPlaying, playbackSpeed]);
+  const timeoutRef = useRef<number | null>(null);
+  const isRunningRef = useRef(false);
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTimeIndex(parseInt(e.target.value, 10));
-  };
-
-  const togglePlay = () => {
+  const scheduleNextTick = useCallback(() => {
     const state = useAppStore.getState();
-    const maxIdx = Math.max(0, state.timelineEvents.length - 1);
-    if (state.currentTimeIndex >= maxIdx) {
-      useAppStore.getState().setTimeIndex(0);
+    if (!state.isPlaying) {
+      isRunningRef.current = false;
+      timeoutRef.current = null;
+      return;
     }
-    useAppStore.getState().setPlaying(!state.isPlaying);
-  };
+    const curMax = Math.max(0, (state.timelineEvents?.length || 0) - 1);
+    if (state.currentTimeIndex >= curMax) {
+      useAppStore.getState().setPlaying(false);
+      isRunningRef.current = false;
+      timeoutRef.current = null;
+      return;
+    }
+    const next = Math.min(state.currentTimeIndex + 1, curMax);
+    useAppStore.getState().setTimeIndex(next);
+    const delayMs = Math.max(50, Math.floor(1000 / state.playbackSpeed));
+    timeoutRef.current = window.setTimeout(scheduleNextTick, delayMs);
+  }, []);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      isRunningRef.current = false;
+      return;
+    }
+    if (isRunningRef.current) {
+      return;
+    }
+    isRunningRef.current = true;
+    const delayMs = Math.max(50, Math.floor(1000 / playbackSpeed));
+    timeoutRef.current = window.setTimeout(scheduleNextTick, delayMs);
+    return () => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      isRunningRef.current = false;
+    };
+  }, [isPlaying, playbackSpeed, scheduleNextTick]);
+
+  const handleSliderChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = parseInt(e.target.value, 10);
+      setTimeIndex(val);
+    },
+    [setTimeIndex],
+  );
+
+  const togglePlay = useCallback(() => {
+    const state = useAppStore.getState();
+    const curMax = Math.max(0, (state.timelineEvents?.length || 0) - 1);
+    let nextIdx = state.currentTimeIndex;
+    let nextPlaying = !state.isPlaying;
+    if (state.currentTimeIndex >= curMax && !state.isPlaying) {
+      nextIdx = 0;
+    }
+    if (nextIdx !== state.currentTimeIndex) {
+      useAppStore.getState().setTimeIndex(nextIdx);
+    }
+    useAppStore.getState().setPlaying(nextPlaying);
+  }, []);
 
   const speeds: Array<1 | 2 | 4> = [1, 2, 4];
+  const progressPct = maxIndex > 0 ? (currentTimeIndex / maxIndex) * 100 : 0;
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-4xl px-4">
@@ -74,24 +142,31 @@ export default function Timeline() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3 shrink-0">
             <button
+              type="button"
               onClick={togglePlay}
-              className="w-10 h-10 rounded-full bg-nebula-purple/30 border border-white/20 flex items-center justify-center text-white hover:bg-nebula-purple/50 hover:shadow-[0_0_15px_rgba(99,102,241,0.5)] transition-all duration-300"
+              className="w-10 h-10 rounded-full bg-nebula-purple/30 border border-white/20 flex items-center justify-center text-white hover:bg-nebula-purple/50 hover:shadow-[0_0_15px_rgba(99,102,241,0.5)] transition-all duration-300 active:scale-95"
             >
               {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
             </button>
 
             <div ref={speedMenuRef} className="relative">
               <button
-                onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all text-sm font-medium"
+                type="button"
+                onClick={() => setShowSpeedMenu((v) => !v)}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all text-sm font-medium active:scale-95"
               >
-                {playbackSpeed}x
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showSpeedMenu ? 'rotate-180' : ''}`} />
+                <span>{playbackSpeed}x</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    showSpeedMenu ? 'rotate-180' : ''
+                  }`}
+                />
               </button>
               {showSpeedMenu && (
-                <div className="absolute bottom-full mb-2 left-0 right-0 backdrop-blur-xl bg-space-900/90 border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                <div className="absolute bottom-full mb-2 left-0 right-0 backdrop-blur-xl bg-space-900/95 border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50">
                   {speeds.map((s) => (
                     <button
+                      type="button"
                       key={s}
                       onClick={() => {
                         setPlaybackSpeed(s);
@@ -117,6 +192,7 @@ export default function Timeline() {
                 type="range"
                 min={0}
                 max={maxIndex}
+                step={1}
                 value={currentTimeIndex}
                 onChange={handleSliderChange}
                 className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer
@@ -140,17 +216,21 @@ export default function Timeline() {
                   [&::-moz-range-thumb]:cursor-pointer
                 "
                 style={{
-                  background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(currentTimeIndex / Math.max(maxIndex, 1)) * 100}%, rgba(255,255,255,0.1) ${(currentTimeIndex / Math.max(maxIndex, 1)) * 100}%, rgba(255,255,255,0.1) 100%)`,
+                  background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${progressPct}%, rgba(255,255,255,0.1) ${progressPct}%, rgba(255,255,255,0.1) 100%)`,
                 }}
               />
               <div className="flex justify-between mt-2 px-1">
-                {timelineEvents.length > 0 && (
+                {timelineEvents?.length > 0 && (
                   <>
-                    <span className="text-xs text-white/30">{getQuarterLabel(0, timelineEvents)}</span>
+                    <span className="text-xs text-white/30">
+                      {getQuarterLabel(0, timelineEvents)}
+                    </span>
                     <span className="text-xs text-white/30">
                       {getQuarterLabel(Math.floor(maxIndex / 2), timelineEvents)}
                     </span>
-                    <span className="text-xs text-white/30">{getQuarterLabel(maxIndex, timelineEvents)}</span>
+                    <span className="text-xs text-white/30">
+                      {getQuarterLabel(maxIndex, timelineEvents)}
+                    </span>
                   </>
                 )}
               </div>
@@ -161,7 +241,7 @@ export default function Timeline() {
                 {getQuarterLabel(currentTimeIndex, timelineEvents)}
               </div>
               <div className="text-white/40 text-xs">
-                {currentTimeIndex + 1} / {timelineEvents.length}
+                {currentTimeIndex + 1} / {timelineEvents?.length || 0}
               </div>
             </div>
           </div>
