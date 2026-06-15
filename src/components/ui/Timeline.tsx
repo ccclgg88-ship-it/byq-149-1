@@ -42,23 +42,28 @@ export default function Timeline() {
   useEffect(() => {
     if (!isPlaying) return;
     const interval = setInterval(() => {
-      setTimeIndex(Math.min(currentTimeIndex + 1, maxIndex));
-      if (currentTimeIndex >= maxIndex) {
-        setPlaying(false);
+      const state = useAppStore.getState();
+      const maxIdx = Math.max(0, state.timelineEvents.length - 1);
+      if (state.currentTimeIndex >= maxIdx) {
+        useAppStore.getState().setPlaying(false);
+        return;
       }
+      useAppStore.getState().setTimeIndex(state.currentTimeIndex + 1);
     }, 1000 / playbackSpeed);
     return () => clearInterval(interval);
-  }, [isPlaying, playbackSpeed, currentTimeIndex, maxIndex, setTimeIndex, setPlaying]);
+  }, [isPlaying, playbackSpeed]);
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTimeIndex(parseInt(e.target.value, 10));
   };
 
   const togglePlay = () => {
-    if (currentTimeIndex >= maxIndex) {
-      setTimeIndex(0);
+    const state = useAppStore.getState();
+    const maxIdx = Math.max(0, state.timelineEvents.length - 1);
+    if (state.currentTimeIndex >= maxIdx) {
+      useAppStore.getState().setTimeIndex(0);
     }
-    setPlaying(!isPlaying);
+    useAppStore.getState().setPlaying(!state.isPlaying);
   };
 
   const speeds: Array<1 | 2 | 4> = [1, 2, 4];

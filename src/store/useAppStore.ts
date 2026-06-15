@@ -103,7 +103,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   renderStats: { fps: 0, nodeCount: 0 },
 
   setOrgData: (root, employees, events) => {
-    set({ orgRoot: root, allEmployees: employees, timelineEvents: events, currentTimeIndex: events.length });
+    const maxIdx = Math.max(0, events.length - 1);
+    set({
+      orgRoot: root,
+      allEmployees: employees,
+      timelineEvents: events,
+      currentTimeIndex: maxIdx,
+    });
   },
 
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -126,7 +132,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectEmployee: (emp) => set({ selectedEmployee: emp }),
   triggerPulse: (nodeId) => set({ highlightPulse: { nodeId, pulseStartTime: Date.now() } }),
 
-  setTimeIndex: (idx) => set({ currentTimeIndex: idx }),
+  setTimeIndex: (idx: number) => {
+    const { timelineEvents } = get();
+    const maxIdx = Math.max(0, timelineEvents.length - 1);
+    const safeIdx = Math.max(0, Math.min(Math.floor(idx), maxIdx));
+    set({ currentTimeIndex: safeIdx });
+  },
   setPlaying: (p) => set({ isPlaying: p }),
   setPlaybackSpeed: (s) => set({ playbackSpeed: s }),
 

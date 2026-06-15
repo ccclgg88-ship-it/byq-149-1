@@ -1,13 +1,11 @@
 import { useRef, useMemo, useEffect, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { EffectComposer, Bloom, FXAA } from '@react-three/postprocessing';
 import Stats from 'stats.js';
 import { OrgNode, Vec3, ViewMode } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
 import { computeTreeLayout, computeFlatLayout, applyLayout } from './LayoutEngine';
 import { useForceLayout } from '@/hooks/useForceLayout';
-import { useAnimationFrame } from '@/hooks/useAnimationFrame';
 import OrgNodeMesh from './OrgNodeMesh';
 import ConnectionLines from './ConnectionLines';
 import Starfield from './Starfield';
@@ -19,11 +17,6 @@ function SceneContent() {
     selectedNodeId,
     highlightedNodeIds,
     highlightPulse,
-    isPlaying,
-    playbackSpeed,
-    currentTimeIndex,
-    timelineEvents,
-    setTimeIndex,
     setRenderStats,
     selectNode,
     toggleExpandNode,
@@ -97,17 +90,6 @@ function SceneContent() {
       reheat();
     }
   }, [orgRoot, viewMode, reheat]);
-
-  useAnimationFrame(
-    (delta) => {
-      if (!isPlaying || !timelineEvents.length) return;
-      const maxIndex = timelineEvents.length;
-      const increment = (delta / 1000) * playbackSpeed * 0.5;
-      const nextIndex = Math.min(currentTimeIndex + increment, maxIndex);
-      setTimeIndex(nextIndex);
-    },
-    isPlaying,
-  );
 
   useFrame(() => {
     if (statsRef.current) {
