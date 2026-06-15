@@ -1,0 +1,40 @@
+{
+  "name": "3d-org-nebula",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3006",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 3006",
+    "check": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0",
+    "zustand": "^4.5.4",
+    "three": "^0.160.0",
+    "@react-three/fiber": "^8.15.19",
+    "@react-three/drei": "^9.99.0",
+    "@react-three/postprocessing": "^2.16.2",
+    "d3-force-3d": "^3.0.5",
+    "lucide-react": "^0.408.0",
+    "stats.js": "^0.17.0",
+    "html2canvas": "^1.4.1",
+    "tailwind-merge": "^2.4.0",
+    "clsx": "^2.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.160.0",
+    "@types/stats.js": "^0.17.3",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}
